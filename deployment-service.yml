@@ -19,7 +19,7 @@ spec:
         app: emailservice
     spec:
       containers:
-      - name: server
+      - name: emailservice
         image: hemanthk235/emailservice:latest
         ports:
         - containerPort: 8080
@@ -38,8 +38,6 @@ spec:
   ports:
   - port: 5000
     targetPort: 8080
-  type: ClusterIP
-
 ---
 # ================= CHECKOUT SERVICE =================
 apiVersion: apps/v1
@@ -57,15 +55,25 @@ spec:
         app: checkoutservice
     spec:
       containers:
-      - name: server
+      - name: checkoutservice
         image: hemanthk235/checkoutservice:latest
         ports:
         - containerPort: 5050
         env:
         - name: PORT
           value: "5050"
+        - name: PRODUCT_CATALOG_SERVICE_ADDR
+          value: "productcatalogservice:3550"
+        - name: SHIPPING_SERVICE_ADDR
+          value: "shippingservice:50051"
+        - name: PAYMENT_SERVICE_ADDR
+          value: "paymentservice:50051"
         - name: EMAIL_SERVICE_ADDR
           value: "emailservice:5000"
+        - name: CURRENCY_SERVICE_ADDR
+          value: "currencyservice:7000"
+        - name: CART_SERVICE_ADDR
+          value: "cartservice:7070"
 ---
 apiVersion: v1
 kind: Service
@@ -78,10 +86,8 @@ spec:
   ports:
   - port: 5050
     targetPort: 5050
-  type: ClusterIP
-
 ---
-# ================= RECOMMENDATION SERVICE =================
+# ================= RECOMMENDATION =================
 apiVersion: apps/v1
 kind: Deployment
 metadata:
@@ -97,10 +103,13 @@ spec:
         app: recommendationservice
     spec:
       containers:
-      - name: server
+      - name: recommendationservice
         image: hemanthk235/recommendationservice:latest
         ports:
         - containerPort: 8080
+        env:
+        - name: PRODUCT_CATALOG_SERVICE_ADDR
+          value: "productcatalogservice:3550"
 ---
 apiVersion: v1
 kind: Service
@@ -113,8 +122,6 @@ spec:
   ports:
   - port: 8080
     targetPort: 8080
-  type: ClusterIP
-
 ---
 # ================= FRONTEND =================
 apiVersion: apps/v1
@@ -132,7 +139,7 @@ spec:
         app: frontend
     spec:
       containers:
-      - name: server
+      - name: frontend
         image: hemanthk235/frontend:latest
         ports:
         - containerPort: 8080
@@ -141,6 +148,8 @@ spec:
           value: "productcatalogservice:3550"
         - name: CART_SERVICE_ADDR
           value: "cartservice:7070"
+        - name: SHIPPING_SERVICE_ADDR
+          value: "shippingservice:50051"
         - name: CHECKOUT_SERVICE_ADDR
           value: "checkoutservice:5050"
         - name: RECOMMENDATION_SERVICE_ADDR
@@ -152,15 +161,14 @@ metadata:
   name: frontend
   namespace: webapps
 spec:
+  type: LoadBalancer
   selector:
     app: frontend
   ports:
   - port: 80
     targetPort: 8080
-  type: LoadBalancer
-
 ---
-# ================= PAYMENT SERVICE =================
+# ================= PAYMENT =================
 apiVersion: apps/v1
 kind: Deployment
 metadata:
@@ -176,10 +184,13 @@ spec:
         app: paymentservice
     spec:
       containers:
-      - name: server
+      - name: paymentservice
         image: hemanthk235/paymentservice:latest
         ports:
         - containerPort: 50051
+        env:
+        - name: PORT
+          value: "50051"
 ---
 apiVersion: v1
 kind: Service
@@ -192,10 +203,8 @@ spec:
   ports:
   - port: 50051
     targetPort: 50051
-  type: ClusterIP
-
 ---
-# ================= PRODUCT CATALOG =================
+# ================= PRODUCT =================
 apiVersion: apps/v1
 kind: Deployment
 metadata:
@@ -211,7 +220,7 @@ spec:
         app: productcatalogservice
     spec:
       containers:
-      - name: server
+      - name: productcatalogservice
         image: hemanthk235/productcatalogservice:latest
         ports:
         - containerPort: 3550
@@ -227,10 +236,8 @@ spec:
   ports:
   - port: 3550
     targetPort: 3550
-  type: ClusterIP
-
 ---
-# ================= CART SERVICE =================
+# ================= CART =================
 apiVersion: apps/v1
 kind: Deployment
 metadata:
@@ -246,7 +253,7 @@ spec:
         app: cartservice
     spec:
       containers:
-      - name: server
+      - name: cartservice
         image: hemanthk235/cartservice:latest
         ports:
         - containerPort: 7070
@@ -262,4 +269,108 @@ spec:
   ports:
   - port: 7070
     targetPort: 7070
-  type: ClusterIP
+---
+# ================= SHIPPING =================
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: shippingservice
+  namespace: webapps
+spec:
+  selector:
+    matchLabels:
+      app: shippingservice
+  template:
+    metadata:
+      labels:
+        app: shippingservice
+    spec:
+      containers:
+      - name: shippingservice
+        image: hemanthk235/shippingservice:latest
+        ports:
+        - containerPort: 50051
+        env:
+        - name: PORT
+          value: "50051"
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: shippingservice
+  namespace: webapps
+spec:
+  selector:
+    app: shippingservice
+  ports:
+  - port: 50051
+    targetPort: 50051
+---
+# ================= REDIS =================
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: redis-cart
+  namespace: webapps
+spec:
+  selector:
+    matchLabels:
+      app: redis-cart
+  template:
+    metadata:
+      labels:
+        app: redis-cart
+    spec:
+      containers:
+      - name: redis
+        image: redis:alpine
+        ports:
+        - containerPort: 6379
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: redis-cart
+  namespace: webapps
+spec:
+  selector:
+    app: redis-cart
+  ports:
+  - port: 6379
+    targetPort: 6379
+---
+# ================= AD SERVICE =================
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: adservice
+  namespace: webapps
+spec:
+  selector:
+    matchLabels:
+      app: adservice
+  template:
+    metadata:
+      labels:
+        app: adservice
+    spec:
+      containers:
+      - name: adservice
+        image: hemanthk235/adservice:latest
+        ports:
+        - containerPort: 9555
+        env:
+        - name: PORT
+          value: "9555"
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: adservice
+  namespace: webapps
+spec:
+  selector:
+    app: adservice
+  ports:
+  - port: 9555
+    targetPort: 9555
